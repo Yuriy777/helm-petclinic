@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-deployment
+  labels:
+    app: {{ .Chart.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          {{- if .Values.image }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          {{- end }}
+          env:
+            {{- if .Values.postgresql.enabled }}
+            - name: SPRING_PROFILES_ACTIVE
+              value: postgres
+            - name: POSTGRES_URL
+              value: jdbc:postgresql://{{ .Release.Name }}-postgresql/{{ .Values.postgresql.auth.database }}
+            - name: POSTGRES_USER
+              value: {{ .Values.postgresql.auth.username }}
+            - name: POSTGRES_PASS
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: {{ .Release.Name }}-postgresql
+          {{- else if .Values.mysql.enabled }}
+            - name: SPRING_PROFILES_ACTIVE
+              value: mysql
+            - name: MYSQL_URL
+              value: jdbc:mysql://{{ .Release.Name }}-mysql/{{ .Values.mysql.auth.database }}
+            - name: MYSQL_USER
+              value: {{ .Values.mysql.auth.username }}
+            - name: MYSQL_PASS
+              valueFrom:
+                secretKeyRef:
+                  key: mysql-password
+                  name: {{ .Release.Name }}-mysql
+          {{- else }}
+          {{- end }}
+          resources:
+            {{ toYaml .Values.resources | nindent 12 }}
+          ports:
+          - containerPort: {{ .Values.service.containerPort }}
+            name: http-port
